@@ -1,9 +1,13 @@
 [package]
 name = "bank_vault"
 description = "Defines a Vault collection which hides its contents and operates on keys"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/ChefPancake/bank_vault/"
+repository = "https://github.com/ChefPancake/bank_vault/"
 version = "0.0.1"
-authors = ["ChefPancake <https://github.com/ChefPancake>"]
+authors = ["ChefPancake"]
 edition = "2018"
+readme = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
