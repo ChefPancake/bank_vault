@@ -24,17 +24,17 @@ pub mod bank_vault {
     impl<T> Vault<T> {
         pub fn new() -> Vault<T>{
             let map = HashMap::new();
-            return Vault {items: map};
+            Vault {items: map}
         }
 
         pub fn remove(&mut self, key: &VaultKey) -> Option<T>{
-            return self.items.remove(key);
+            self.items.remove(key)
         }
 
         pub fn add(&mut self, to_add: T) -> VaultKey {
             let key = VaultKey::new();
             self.items.insert(key, to_add);
-            return key;
+            key
         }
 
         pub fn has_item(&self, key: &VaultKey) -> bool {
@@ -42,11 +42,7 @@ pub mod bank_vault {
         }
 
         pub fn add_with_key(&mut self, to_add: T, key: &VaultKey) -> bool {
-            let insert = self.items.insert(*key, to_add);
-            match insert {
-                Some(_) => false,
-                None => true
-            }
+            self.items.insert(*key, to_add).is_none()
         }
 
         pub fn update_item<F>(&mut self, key: &VaultKey, mut operation: F) -> bool
