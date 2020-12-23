@@ -1,67 +1,170 @@
 #![feature(option_unwrap_none)]
-pub mod bank_vault {
-    use uuid::Uuid;
-    use std::collections::HashMap;
+use uuid::Uuid;
+use std::collections::HashMap;
 
-    #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-    pub struct VaultKey {
-        key: Uuid,
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+pub struct VaultKey {
+    key: Uuid,
+}
+
+impl VaultKey {
+    pub fn new() -> VaultKey {
+        VaultKey {key: Uuid::new_v4()}
+    }
+    pub fn zero() -> VaultKey {
+        VaultKey {key: Uuid::nil()}
+    }
+}
+
+pub struct Vault<T> {
+    items: HashMap<VaultKey, T>,
+}
+
+impl<T> Vault<T> {
+    /// Creates a new, empty Vault instance.
+    /// # Example
+    /// 
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::Vault;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let mut vault = Vault::<i32>::new();
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn new() -> Vault<T>{
+        let map = HashMap::new();
+        Vault {items: map}
     }
 
-    impl VaultKey {
-        pub fn new() -> VaultKey {
-            VaultKey {key: Uuid::new_v4()}
-        }
-        pub fn zero() -> VaultKey {
-            VaultKey {key: Uuid::nil()}
-        }
+    /// Adds an object to the vault and returns a key.
+    /// # Example
+    /// 
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::Vault;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let mut vault = Vault::<i32>::new();
+    /// 
+    /// let key = vault.add(1);
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn add(&mut self, to_add: T) -> VaultKey {
+        let key = VaultKey::new();
+        self.items.insert(key, to_add);
+        key
     }
-    
-    pub struct Vault<T> {
-        items: HashMap<VaultKey, T>,
+
+    /// Removes and returns the stored object with a matching key, if it exists, otherwise returns None.
+    /// # Example
+    /// 
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::Vault;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let mut vault = Vault::<i32>::new();
+    /// let key = vault.add(1);
+    /// 
+    /// let item = vault.remove(&key);
+    /// assert_eq!(Some(1), item);
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn remove(&mut self, key: &VaultKey) -> Option<T>{
+        self.items.remove(key)
     }
 
-    impl<T> Vault<T> {
-        pub fn new() -> Vault<T>{
-            let map = HashMap::new();
-            Vault {items: map}
-        }
+    /// Returns true if there exists an item in the vault with the provided key, otherwise returns false.
+    /// # Example
+    /// 
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::Vault;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let mut vault = Vault::<i32>::new();
+    /// let key = vault.add(1);
+    /// 
+    /// let has_item = vault.has_item(&key);
+    /// assert_eq!(true, has_item);
+    /// #     Ok(())
+    /// # }
+    /// ```    
+    pub fn has_item(&self, key: &VaultKey) -> bool {
+        self.items.contains_key(key)
+    }
 
-        pub fn remove(&mut self, key: &VaultKey) -> Option<T>{
-            self.items.remove(key)
-        }
+    /// Adds an item to the vault with the specified key. If the key already is in use, the item is not added and this returns false. If the key is not already in use, the item is added and returns true.
+    /// # Example
+    /// 
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::{Vault, VaultKey};
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let mut vault = Vault::<i32>::new();
+    /// let key = VaultKey::new();
+    /// 
+    /// let is_true = vault.add_with_key(1, &key);
+    /// assert_eq!(true, is_true);
+    /// let is_false = vault.add_with_key(2, &key);
+    /// assert_eq!(false, is_false);
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn add_with_key(&mut self, to_add: T, key: &VaultKey) -> bool {
+        self.items.insert(*key, to_add).is_none()
+    }
 
-        pub fn add(&mut self, to_add: T) -> VaultKey {
-            let key = VaultKey::new();
-            self.items.insert(key, to_add);
-            key
-        }
+    /// Updates an item in the vault with the specified key by applying the operation to it. Returns false if an item with the key is not found, otherwise returns true.
+    /// # Example
+    /// 
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::{Vault, VaultKey};
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let mut vault = Vault::<i32>::new();
+    /// let key = vault.add(1);
+    /// 
+    /// let double_me = |i:i32| i * 2;
+    /// 
+    /// let updated = vault.update_item(&key, double_me);
+    /// assert_eq!(true, updated);
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn update_item<F>(&mut self, key: &VaultKey, mut operation: F) -> bool
+            where F: FnMut(T) -> T {
+        self.remove(key).map(|i| {
+            let updated = operation(i);
+            self.add_with_key(updated, key)
+        }).is_some()
+    }
 
-        pub fn has_item(&self, key: &VaultKey) -> bool {
-            self.items.contains_key(key)
-        }
-
-        pub fn add_with_key(&mut self, to_add: T, key: &VaultKey) -> bool {
-            self.items.insert(*key, to_add).is_none()
-        }
-
-        pub fn update_item<F>(&mut self, key: &VaultKey, mut operation: F) -> bool
-                where F: FnMut(&mut T) -> () {
-            self.remove(key).map(|mut i| {
-                operation(&mut i);
-                self.add_with_key(i, key)
-            }).is_some()
-        }
-
-        pub fn clear(&mut self) {
-            self.items.clear()
-        }
+    /// Clears the contents of the vault.
+    /// # Example
+    /// 
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::{Vault, VaultKey};
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let mut vault = Vault::<i32>::new();
+    /// let key = vault.add(1);
+    /// 
+    /// vault.clear();
+    /// 
+    /// let has_item = vault.has_item(&key);
+    /// assert_eq!(false, has_item);
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn clear(&mut self) {
+        self.items.clear()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::bank_vault::*;
+    use super::*;
 
     #[test]
     fn add_has_item() {
@@ -135,7 +238,7 @@ mod tests {
         let mut vault = Vault::new();
         let to_add = 1.0;
         let key = vault.add(to_add);
-        let double = |i:&mut f64| *i = *i * 2.0;
+        let double = |i:f64| i * 2.0;
         let expected = 2.0;
         let updated = vault.update_item(&key, double);
         let retrieved = vault.remove(&key).unwrap();
