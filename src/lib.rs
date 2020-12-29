@@ -8,9 +8,36 @@ pub struct VaultKey {
 }
 
 impl VaultKey {
+    /// Creates a new unique VaultKey
+    /// # Example
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::VaultKey;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let key_1 = VaultKey::new();
+    /// let key_2 = VaultKey::new();
+    /// 
+    /// assert_ne!(key_1, key_2);
+    /// #     Ok(())
+    /// # }
+    /// ```
     pub fn new() -> VaultKey {
         VaultKey {key: Uuid::new_v4()}
     }
+
+    /// Creates a default, zero-valued VaultKey
+    /// # Example
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use bank_vault::VaultKey;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let key_1 = VaultKey::zero();
+    /// let key_2 = VaultKey::zero();
+    /// 
+    /// assert_eq!(key_1, key_2); 
+    /// #     Ok(())
+    /// # }
+    /// ```
     pub fn zero() -> VaultKey {
         VaultKey {key: Uuid::nil()}
     }
