@@ -1,6 +1,7 @@
 #![feature(option_unwrap_none)]
 use uuid::Uuid;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct VaultKey {
@@ -44,7 +45,7 @@ impl VaultKey {
 }
 
 pub struct Vault<T> {
-    items: HashMap<VaultKey, T>,
+    items: Mutex<HashMap<VaultKey, T>>
 }
 
 impl<T> Vault<T> {
@@ -55,13 +56,14 @@ impl<T> Vault<T> {
     /// # use std::error::Error;
     /// # use bank_vault::Vault;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let mut vault = Vault::<i32>::new();
+    /// let vault = Vault::<i32>::new();
     /// #     Ok(())
     /// # }
     /// ```
     pub fn new() -> Vault<T>{
         let map = HashMap::new();
-        Vault {items: map}
+        let mutex = Mutex::from(map);
+        Vault {items: mutex}
     }
 
     /// Adds an object to the vault and returns a key.
@@ -71,15 +73,16 @@ impl<T> Vault<T> {
     /// # use std::error::Error;
     /// # use bank_vault::Vault;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let mut vault = Vault::<i32>::new();
+    /// let vault = Vault::<i32>::new();
     /// 
     /// let key = vault.add(1);
     /// #     Ok(())
     /// # }
     /// ```
-    pub fn add(&mut self, to_add: T) -> VaultKey {
+    pub fn add(&self, to_add: T) -> VaultKey {
+        let mut unlocked = self.items.try_lock().unwrap();
         let key = VaultKey::new();
-        self.items.insert(key, to_add);
+        unlocked.insert(key, to_add);
         key
     }
 
@@ -90,7 +93,7 @@ impl<T> Vault<T> {
     /// # use std::error::Error;
     /// # use bank_vault::Vault;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let mut vault = Vault::<i32>::new();
+    /// let vault = Vault::<i32>::new();
     /// let key = vault.add(1);
     /// 
     /// let item = vault.remove(&key);
@@ -98,8 +101,8 @@ impl<T> Vault<T> {
     /// #     Ok(())
     /// # }
     /// ```
-    pub fn remove(&mut self, key: &VaultKey) -> Option<T>{
-        self.items.remove(key)
+    pub fn remove(&self, key: &VaultKey) -> Option<T>{
+        self.items.try_lock().unwrap().remove(key)
     }
 
     /// Returns true if there exists an item in the vault with the provided key, otherwise returns false.
@@ -109,7 +112,7 @@ impl<T> Vault<T> {
     /// # use std::error::Error;
     /// # use bank_vault::Vault;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let mut vault = Vault::<i32>::new();
+    /// let vault = Vault::<i32>::new();
     /// let key = vault.add(1);
     /// 
     /// let has_item = vault.has_item(&key);
@@ -118,7 +121,7 @@ impl<T> Vault<T> {
     /// # }
     /// ```    
     pub fn has_item(&self, key: &VaultKey) -> bool {
-        self.items.contains_key(key)
+        self.items.try_lock().unwrap().contains_key(key)
     }
 
     /// Adds an item to the vault with the specified key. If the key already is in use, the item is not added and this returns false. If the key is not already in use, the item is added and returns true.
@@ -128,7 +131,7 @@ impl<T> Vault<T> {
     /// # use std::error::Error;
     /// # use bank_vault::{Vault, VaultKey};
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let mut vault = Vault::<i32>::new();
+    /// let vault = Vault::<i32>::new();
     /// let key = VaultKey::new();
     /// 
     /// let is_true = vault.add_with_key(1, &key);
@@ -138,8 +141,8 @@ impl<T> Vault<T> {
     /// #     Ok(())
     /// # }
     /// ```
-    pub fn add_with_key(&mut self, to_add: T, key: &VaultKey) -> bool {
-        self.items.insert(*key, to_add).is_none()
+    pub fn add_with_key(&self, to_add: T, key: &VaultKey) -> bool {
+        self.items.try_lock().unwrap().insert(*key, to_add).is_none()
     }
 
     /// Updates an item in the vault with the specified key by applying the operation to it. Returns false if an item with the key is not found, otherwise returns true.
@@ -149,7 +152,7 @@ impl<T> Vault<T> {
     /// # use std::error::Error;
     /// # use bank_vault::{Vault, VaultKey};
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let mut vault = Vault::<i32>::new();
+    /// let vault = Vault::<i32>::new();
     /// let key = vault.add(1);
     /// 
     /// let double_me = |i:i32| i * 2;
@@ -159,7 +162,7 @@ impl<T> Vault<T> {
     /// #     Ok(())
     /// # }
     /// ```
-    pub fn update_item<F>(&mut self, key: &VaultKey, mut operation: F) -> bool
+    pub fn update_item<F>(&self, key: &VaultKey, mut operation: F) -> bool
             where F: FnMut(T) -> T {
         self.remove(key).map(|i| {
             let updated = operation(i);
@@ -174,7 +177,7 @@ impl<T> Vault<T> {
     /// # use std::error::Error;
     /// # use bank_vault::{Vault, VaultKey};
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let mut vault = Vault::<i32>::new();
+    /// let vault = Vault::<i32>::new();
     /// let key = vault.add(1);
     /// 
     /// vault.clear();
@@ -184,8 +187,8 @@ impl<T> Vault<T> {
     /// #     Ok(())
     /// # }
     /// ```
-    pub fn clear(&mut self) {
-        self.items.clear()
+    pub fn clear(&self) {
+        self.items.try_lock().unwrap().clear()
     }
 }
 
@@ -195,7 +198,7 @@ mod tests {
 
     #[test]
     fn add_has_item() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = "stuff";
         let key = vault.add(to_add);
         let has_item = vault.has_item(&key);
@@ -204,7 +207,7 @@ mod tests {
 
     #[test]
     fn has_item_wrong_key() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = "garbage";
         vault.add(to_add);
         let wrong_key = VaultKey::new();
@@ -214,7 +217,7 @@ mod tests {
 
     #[test]
     fn add_duplicates_unique_keys() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = 1.0;
         let key_1 = vault.add(to_add);
         let key_2 = vault.add(to_add);
@@ -223,7 +226,7 @@ mod tests {
 
     #[test]
     fn add_with_key_has_item() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = 1.0;
         let key = VaultKey::new();
         let added = vault.add_with_key(to_add, &key);
@@ -234,7 +237,7 @@ mod tests {
 
     #[test]
     fn add_with_key_duplicate_fails() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = 1.0;
         let key = VaultKey::new();
         let added_1 = vault.add_with_key(to_add, &key);
@@ -245,7 +248,7 @@ mod tests {
 
     #[test]
     fn add_remove() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = 1;
         let key = vault.add(to_add);
         let retrieved = vault.remove(&key).unwrap();
@@ -254,7 +257,7 @@ mod tests {
 
     #[test]
     fn remove_before_add() {
-        let mut vault = Vault::<i32>::new();
+        let vault = Vault::<i32>::new();
         let key = VaultKey::new();
         let retrieved = vault.remove(&key);
         assert_eq!(None, retrieved);
@@ -262,7 +265,7 @@ mod tests {
 
     #[test]
     fn add_update() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = 1.0;
         let key = vault.add(to_add);
         let double = |i:f64| i * 2.0;
@@ -275,7 +278,7 @@ mod tests {
 
     #[test]
     fn add_remove_twice() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = 3;
         let key = vault.add(to_add);
         vault.remove(&key);
@@ -285,7 +288,7 @@ mod tests {
 
     #[test] 
     fn add_clear_doesnt_have_item() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = "thing";
         let key = vault.add(to_add);
         vault.clear();
@@ -295,7 +298,7 @@ mod tests {
 
     #[test]
     fn add_remove_doesnt_have_item() {
-        let mut vault = Vault::new();
+        let vault = Vault::new();
         let to_add = "an item";
         let key = vault.add(to_add);
         vault.remove(&key);
