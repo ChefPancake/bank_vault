@@ -4,6 +4,7 @@ description = "Defines a Vault collection which hides its contents and operates 
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/ChefPancake/bank_vault/"
 repository = "https://github.com/ChefPancake/bank_vault/"
+documentation = "https://docs.rs/bank_vault"
 version = "0.0.1"
 authors = ["ChefPancake"]
 edition = "2018"
